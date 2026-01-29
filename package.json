@@ -1,0 +1,32 @@
+{
+  "name": "playwright-mcp-app",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Playwright MCP App with visual timeline UI",
+  "scripts": {
+    "build": "tsc --noEmit && tsc -p tsconfig.server.json && cross-env INPUT=timeline.html vite build",
+    "start": "concurrently 'cross-env NODE_ENV=development INPUT=timeline.html vite build --watch' 'tsx watch main.ts'",
+    "start:stdio": "node dist/main.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@vscode-elements/elements": "^2.4.0",
+    "playwright": "^1.40.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "concurrently": "^8.2.0",
+    "cross-env": "^7.0.3",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0",
+    "vite-plugin-singlefile": "^0.13.0"
+  }
+}
