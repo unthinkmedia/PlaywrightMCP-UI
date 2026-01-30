@@ -1,5 +1,5 @@
 ---
-name: Playwright Timeline MCP App
+name: playwright-timeline
 description: This skill guides development of the Playwright Timeline MCP App - a visual browser automation tool with interactive timeline UI. Use when working with playwright-run tool, timeline components, step replay, screenshot capture, or MCP Apps patterns in this project.
 ---
 

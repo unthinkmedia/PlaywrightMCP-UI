@@ -224,7 +224,7 @@ These examples showcase scenarios where the **visual timeline** provides unique 
 
 > "Record me completing the onboarding tutorial so I can share it with the team."
 
-**Why Timeline MCP helps:** Enable video recording to capture the entire flow, then save the recording for documentation or async review.
+**Why Timeline MCP helps:** Enable video recording to capture the entire flow. When recording is enabled, a "Download Video" button appears in the timeline UI - click it to download the video directly to your local machine, even if the MCP server is running remotely.
 
 ```json
 {
@@ -320,11 +320,11 @@ Open a screenshot in your system's default image viewer.
 
 ### `close-browser` (App-only)
 
-Close the browser session. If video recording was enabled, saves the video.
+Close the browser session. If video recording was enabled, returns the video data for download.
 
-### `save-video` (App-only)
+### `get-video` (App-only)
 
-Save the recorded video to a specified path.
+Get the recorded video data for download to the host machine. Videos are transferred as base64 data through the MCP protocol and downloaded directly to your local machine - even when the MCP server is running remotely.
 
 ## License
 

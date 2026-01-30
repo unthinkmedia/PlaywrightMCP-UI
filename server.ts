@@ -456,13 +456,12 @@ export function createServer(): McpServer {
     "close-browser",
     {
       title: "Close Browser",
-      description: "Close the browser and end the session. If video recording was enabled, returns the video path.",
-      inputSchema: {
-        saveVideoAs: z.string().optional().describe("Optional path to save the video to"),
-      },
+      description: "Close the browser and end the session. If video recording was enabled, returns the video data for download.",
+      inputSchema: {},
       outputSchema: {
         closed: z.boolean(),
-        videoPath: z.string().optional(),
+        videoData: z.string().optional().describe("Base64 encoded video data"),
+        videoFilename: z.string().optional().describe("Suggested filename for download"),
       },
       _meta: {
         ui: {
@@ -471,31 +470,41 @@ export function createServer(): McpServer {
         },
       },
     },
-    async ({ saveVideoAs }) => {
-      let videoPath: string | null = null;
+    async () => {
+      let videoData: string | undefined;
+      let videoFilename: string | undefined;
       
       console.log("[close-browser] isRecordingVideo:", isRecordingVideo, "runner:", !!runner);
       
       if (runner) {
-        // Save video if recording was enabled
+        // Get video data if recording was enabled
         if (isRecordingVideo) {
-          // Ensure videos directory exists
+          // Ensure temp videos directory exists
           try {
             await fs.mkdir(VIDEOS_DIR, { recursive: true });
           } catch {
             // Directory may already exist
           }
           
-          const savePath = saveVideoAs || path.join(VIDEOS_DIR, `recording-${Date.now()}.webm`);
-          console.log("[close-browser] Attempting to save video to:", savePath);
+          const tempPath = path.join(VIDEOS_DIR, `temp-recording-${Date.now()}.webm`);
+          console.log("[close-browser] Saving video temporarily to:", tempPath);
           
           try {
-            await runner.saveVideo(savePath);
-            videoPath = savePath;
-            console.log("[close-browser] Video saved successfully:", videoPath);
+            // Save video to temp location
+            await runner.saveVideo(tempPath);
+            
+            // Read video file as base64
+            const videoBuffer = await fs.readFile(tempPath);
+            videoData = videoBuffer.toString('base64');
+            videoFilename = `playwright-recording-${Date.now()}.webm`;
+            
+            // Clean up temp file
+            await fs.unlink(tempPath).catch(() => {});
+            
+            console.log("[close-browser] Video data ready for download, size:", videoBuffer.length);
           } catch (err) {
             // Video might not be available
-            console.error("[close-browser] Failed to save video:", err);
+            console.error("[close-browser] Failed to get video:", err);
           }
         }
         
@@ -510,32 +519,32 @@ export function createServer(): McpServer {
       return {
         content: [{ 
           type: "text", 
-          text: videoPath ? `Browser closed. Video saved to: ${videoPath}` : "Browser closed" 
+          text: videoData ? "Browser closed. Video ready for download." : "Browser closed" 
         }],
         structuredContent: {
           closed: true,
-          videoPath: videoPath || undefined,
+          videoData,
+          videoFilename,
         },
       };
     }
   );
 
   // ============================================================
-  // TOOL: save-video (app-only)
-  // Save the recorded video to a file
+  // TOOL: get-video (app-only)
+  // Get the recorded video data for download
   // ============================================================
   registerAppTool(
     server,
-    "save-video",
+    "get-video",
     {
-      title: "Save Video",
-      description: "Save the recorded video to a file. Call this before closing the browser if you want to keep the video.",
-      inputSchema: {
-        path: z.string().describe("Path to save the video file (e.g., './videos/my-recording.webm')"),
-      },
+      title: "Get Video",
+      description: "Get the recorded video data for download. Call this while the browser is still open to retrieve the video.",
+      inputSchema: {},
       outputSchema: {
-        saved: z.boolean(),
-        path: z.string().optional(),
+        hasVideo: z.boolean(),
+        videoData: z.string().optional().describe("Base64 encoded video data"),
+        videoFilename: z.string().optional().describe("Suggested filename for download"),
         error: z.string().optional(),
       },
       _meta: {
@@ -545,26 +554,53 @@ export function createServer(): McpServer {
         },
       },
     },
-    async ({ path }) => {
+    async () => {
       if (!runner) {
         return {
           content: [{ type: "text", text: "No active browser session" }],
-          structuredContent: { saved: false, error: "No active browser session" },
+          structuredContent: { hasVideo: false, error: "No active browser session" },
+          isError: true,
+        };
+      }
+      
+      if (!isRecordingVideo) {
+        return {
+          content: [{ type: "text", text: "No video recording active" }],
+          structuredContent: { hasVideo: false, error: "No video recording active" },
           isError: true,
         };
       }
 
       try {
-        await runner.saveVideo(path);
+        // Ensure temp videos directory exists
+        await fs.mkdir(VIDEOS_DIR, { recursive: true }).catch(() => {});
+        
+        const tempPath = path.join(VIDEOS_DIR, `temp-video-${Date.now()}.webm`);
+        
+        // Save video to temp location
+        await runner.saveVideo(tempPath);
+        
+        // Read video file as base64
+        const videoBuffer = await fs.readFile(tempPath);
+        const videoData = videoBuffer.toString('base64');
+        const videoFilename = `playwright-recording-${Date.now()}.webm`;
+        
+        // Clean up temp file
+        await fs.unlink(tempPath).catch(() => {});
+        
         return {
-          content: [{ type: "text", text: `Video saved to: ${path}` }],
-          structuredContent: { saved: true, path },
+          content: [{ type: "text", text: "Video ready for download" }],
+          structuredContent: { 
+            hasVideo: true, 
+            videoData, 
+            videoFilename 
+          },
         };
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err);
         return {
-          content: [{ type: "text", text: `Failed to save video: ${error}` }],
-          structuredContent: { saved: false, error },
+          content: [{ type: "text", text: `Failed to get video: ${error}` }],
+          structuredContent: { hasVideo: false, error },
           isError: true,
         };
       }

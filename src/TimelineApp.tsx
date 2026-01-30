@@ -93,6 +93,7 @@ interface ExecutionSummary {
 interface TimelineData {
   steps: StepResult[];
   summary: ExecutionSummary;
+  videoRecording?: boolean;
 }
 
 // ============================================================
@@ -493,6 +494,7 @@ export function TimelineApp() {
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [scrollSyncEnabled] = useState(false); // Disabled - preview only changes on click
   const [isLoading, setIsLoading] = useState<string | null>(null); // Loading state for async operations
+  const [isVideoRecording, setIsVideoRecording] = useState(false); // Track if video recording is active
   const containerRef = useRef<HTMLDivElement>(null);
   const stepRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const stepsContainerRef = useRef<HTMLDivElement>(null);
@@ -595,7 +597,7 @@ export function TimelineApp() {
         return;
       }
 
-      const structured = result.structuredContent as TimelineData | undefined;
+      const structured = result.structuredContent as (TimelineData & { videoRecording?: boolean }) | undefined;
       if (structured?.steps) {
         setData(structured);
         // Auto-expand failed steps (use array index, not step.index)
@@ -606,6 +608,11 @@ export function TimelineApp() {
             .map((s) => s.arrayIdx)
         );
         setExpandedSteps(failedSteps);
+        
+        // Track video recording state
+        if (structured.videoRecording !== undefined) {
+          setIsVideoRecording(structured.videoRecording);
+        }
         
         // Keep list view by default, user can toggle to preview
         setActiveStepIndex(0);
@@ -755,6 +762,60 @@ export function TimelineApp() {
       }
     },
     []
+  );
+
+  // Download video recording
+  const downloadVideo = useCallback(
+    async () => {
+      if (!app) return;
+      
+      setIsLoading('Preparing video download...');
+      try {
+        const result = await app.callServerTool({
+          name: "get-video",
+          arguments: {},
+        });
+        
+        const structured = result.structuredContent as {
+          hasVideo: boolean;
+          videoData?: string;
+          videoFilename?: string;
+          error?: string;
+        };
+        
+        if (structured?.hasVideo && structured.videoData) {
+          // Create blob from base64 data
+          const byteCharacters = atob(structured.videoData);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'video/webm' });
+          
+          // Trigger download
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = structured.videoFilename || 'playwright-recording.webm';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          setIsLoading('Video downloaded!');
+          setTimeout(() => setIsLoading(null), 2000);
+        } else {
+          setIsLoading(structured?.error || 'No video available');
+          setTimeout(() => setIsLoading(null), 3000);
+        }
+      } catch (err) {
+        console.error("Failed to download video:", err);
+        setIsLoading('Failed to download video');
+        setTimeout(() => setIsLoading(null), 3000);
+      }
+    },
+    [app]
   );
 
   // Listen for escape key from carousel to collapse it
@@ -944,6 +1005,11 @@ export function TimelineApp() {
               <span className="codicon codicon-eye" />
             </button>
           </div>
+          {isVideoRecording && (
+            <button onClick={downloadVideo} className="vscode-button secondary" title="Download recorded video">
+              <span className="codicon codicon-device-camera-video" /> Download Video
+            </button>
+          )}
           {canFullscreen && (
             <button onClick={toggleFullscreen} className="vscode-button secondary" title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
               <span className={`codicon ${isFullscreen ? 'codicon-screen-normal' : 'codicon-screen-full'}`} /> {isFullscreen ? "Exit" : "Fullscreen"}
