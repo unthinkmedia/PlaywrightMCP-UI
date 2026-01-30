@@ -255,7 +255,8 @@ interface ScreenshotCarouselProps {
 }
 
 function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTogglePlay, onPreviewScreenshot, onSaveScreenshot, onAttachScreenshot, onCopySelector }: ScreenshotCarouselProps) {
-  const stepsWithScreenshots = steps.filter(s => s.screenshot);
+  // Filter out standalone "screenshot" type steps - they're redundant with auto-capture
+  const stepsWithScreenshots = steps.filter(s => s.screenshot && s.type !== "screenshot");
   const currentStep = steps[activeIndex];
   const thumbnailsRef = useRef<HTMLDivElement>(null);
   
@@ -376,9 +377,12 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
         </button>
       </div>
 
-      {/* Thumbnail strip */}
+      {/* Thumbnail strip - filter out standalone "screenshot" type steps */}
       <div className="carousel-thumbnails" ref={thumbnailsRef}>
-        {steps.map((step, idx) => (
+        {steps
+          .map((step, idx) => ({ step, idx }))
+          .filter(({ step }) => step.type !== "screenshot")
+          .map(({ step, idx }) => (
           <button
             key={step.index}
             className={`thumbnail ${idx === activeIndex ? 'active' : ''} ${!step.screenshot ? 'no-image' : ''}`}
