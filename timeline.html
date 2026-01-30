@@ -992,12 +992,45 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       }
 
+      .carousel-image-wrapper {
+        position: relative;
+        cursor: pointer;
+        display: inline-block;
+      }
+
+      .carousel-image-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        border-radius: 3px;
+        color: #fff;
+        font-size: 14px;
+      }
+
+      .carousel-image-wrapper:hover .carousel-image-overlay {
+        opacity: 1;
+      }
+
+      .carousel-image-overlay .codicon {
+        font-size: 24px;
+      }
+
       .carousel-step-info {
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
-        margin-top: 12px;
+        margin-top: 4px;
         color: var(--vscode-foreground);
         font-size: 13px;
         background: var(--vscode-editor-background);

@@ -162,7 +162,7 @@ function StepCard({
                 }}
                 title="Attach as context"
               >
-                <span className="codicon codicon-pin" />
+                <span className="codicon codicon-clippy" />
               </button>
             </div>
           )}
@@ -181,9 +181,10 @@ interface ScreenshotCarouselProps {
   isPlaying: boolean;
   onStepSelect: (index: number) => void;
   onTogglePlay: () => void;
+  onPreviewScreenshot: (base64: string, stepIndex: number) => void;
 }
 
-function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTogglePlay }: ScreenshotCarouselProps) {
+function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTogglePlay, onPreviewScreenshot }: ScreenshotCarouselProps) {
   const stepsWithScreenshots = steps.filter(s => s.screenshot);
   const currentStep = steps[activeIndex];
   
@@ -283,11 +284,21 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
         
         <div className="carousel-image-container">
           {currentStep?.screenshot ? (
-            <img
-              src={`data:image/png;base64,${currentStep.screenshot}`}
-              alt={`Step ${activeIndex}: ${currentStep.type}`}
-              className="carousel-image"
-            />
+            <div 
+              className="carousel-image-wrapper"
+              onClick={() => onPreviewScreenshot(currentStep.screenshot!, currentStep.index)}
+              title="Click to open in viewer"
+            >
+              <img
+                src={`data:image/png;base64,${currentStep.screenshot}`}
+                alt={`Step ${activeIndex}: ${currentStep.type}`}
+                className="carousel-image"
+              />
+              <div className="carousel-image-overlay">
+                <span className="codicon codicon-link-external" />
+                <span>Open in viewer</span>
+              </div>
+            </div>
           ) : (
             <div className="carousel-no-screenshot">
               <span className="codicon codicon-device-camera no-screenshot-icon" />
@@ -597,8 +608,15 @@ export function TimelineApp() {
     // Temporarily disable scroll sync to prevent observer from overwriting our selection
     setScrollSyncEnabled(false);
     setActiveStepIndex(index);
-    // Accordion behavior: expand only this step, collapse others
-    setExpandedSteps(new Set([index]));
+    // Toggle behavior: if already expanded, collapse; otherwise expand this and collapse others
+    setExpandedSteps(prev => {
+      if (prev.has(index)) {
+        // Already expanded - collapse it
+        return new Set();
+      }
+      // Expand only this step
+      return new Set([index]);
+    });
     // Scroll the step into view if needed
     const stepEl = stepRefs.current.get(index);
     if (stepEl) {
@@ -764,6 +782,7 @@ export function TimelineApp() {
           isPlaying={isAutoPlaying}
           onStepSelect={selectStep}
           onTogglePlay={toggleAutoPlay}
+          onPreviewScreenshot={previewScreenshot}
         />
       )}
 
