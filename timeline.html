@@ -546,6 +546,21 @@
         background: var(--vscode-button-hoverBackground);
       }
 
+      .icon-button.small {
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+        background: transparent;
+      }
+
+      .icon-button.small .codicon {
+        font-size: 12px;
+      }
+
+      .icon-button.small:hover {
+        background: var(--vscode-button-secondaryBackground);
+      }
+
       /* Button Group */
       .button-group {
         display: inline-flex;
@@ -1022,35 +1037,38 @@
 
       .carousel-image-wrapper {
         position: relative;
-        cursor: pointer;
         display: inline-block;
       }
 
-      .carousel-image-overlay {
+      .carousel-image-wrapper.playing {
+        cursor: pointer;
+      }
+
+      .carousel-play-overlay {
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.6);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 68px;
+        height: 48px;
+        background: rgba(0, 0, 0, 0.8);
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
         display: flex;
-        flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        opacity: 0;
-        transition: opacity 0.2s ease;
-        border-radius: 3px;
         color: #fff;
-        font-size: 14px;
+        transition: all 0.2s ease;
       }
 
-      .carousel-image-wrapper:hover .carousel-image-overlay {
-        opacity: 1;
+      .carousel-play-overlay:hover {
+        background: rgba(204, 0, 0, 0.9);
+        transform: translate(-50%, -50%) scale(1.1);
       }
 
-      .carousel-image-overlay .codicon {
-        font-size: 24px;
+      .carousel-play-overlay .codicon {
+        font-size: 28px;
       }
 
       .carousel-step-info {
@@ -1075,16 +1093,19 @@
         gap: 8px;
         flex: 1;
         min-width: 0;
+        overflow: hidden;
       }
 
       .carousel-step-info .step-info-actions {
         display: flex;
         gap: 4px;
         flex-shrink: 0;
+        margin-left: 8px;
       }
 
       .carousel-step-info .step-badge {
         font-size: 16px;
+        flex-shrink: 0;
       }
 
       .carousel-step-info .step-badge.passed {
@@ -1104,11 +1125,17 @@
         align-items: center;
         gap: 6px;
         font-weight: 500;
+        min-width: 0;
+        overflow: hidden;
       }
 
       .carousel-step-info code {
         font-size: 11px;
         opacity: 0.9;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 200px;
       }
 
       .carousel-no-screenshot {

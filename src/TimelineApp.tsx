@@ -323,16 +323,6 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
             {currentScreenshotIndex >= 0 ? currentScreenshotIndex + 1 : 0} / {stepsWithScreenshots.length}
           </span>
         </span>
-        <div className="carousel-controls">
-          <button 
-            className={`vscode-button ${isPlaying ? 'active' : 'secondary'}`} 
-            onClick={onTogglePlay} 
-            title={isPlaying ? 'Pause (Space)' : isAtEnd ? 'Replay slideshow (Space)' : 'Play slideshow (Space)'}
-          >
-            <span className={`codicon ${isPlaying ? 'codicon-debug-pause' : isAtEnd ? 'codicon-debug-restart' : 'codicon-play'}`} />
-            {isPlaying ? ' Pause' : isAtEnd ? ' Replay' : ' Play'}
-          </button>
-        </div>
       </div>
 
       <div className="carousel-content">
@@ -348,19 +338,24 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
         <div className="carousel-image-container">
           {currentStep?.screenshot ? (
             <div 
-              className="carousel-image-wrapper"
-              onClick={() => onPreviewScreenshot(currentStep.screenshot!, currentStep.index)}
-              title="Click to open in viewer"
+              className={`carousel-image-wrapper ${isPlaying ? 'playing' : ''}`}
+              onClick={isPlaying ? onTogglePlay : undefined}
+              title={isPlaying ? 'Click to pause' : undefined}
             >
               <img
                 src={`data:image/png;base64,${currentStep.screenshot}`}
                 alt={`Step ${activeIndex}: ${currentStep.type}`}
                 className="carousel-image"
               />
-              <div className="carousel-image-overlay">
-                <span className="codicon codicon-link-external" />
-                <span>Open in viewer</span>
-              </div>
+              {!isPlaying && (
+                <button 
+                  className="carousel-play-overlay"
+                  onClick={onTogglePlay}
+                  title={isAtEnd ? 'Replay slideshow (Space)' : 'Play slideshow (Space)'}
+                >
+                  <span className={`codicon ${isAtEnd ? 'codicon-debug-restart' : 'codicon-play'}`} />
+                </button>
+              )}
             </div>
           ) : (
             <div className="carousel-no-screenshot">
@@ -406,45 +401,43 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
             <span className={`step-badge codicon ${currentStep.status === 'passed' ? 'codicon-pass' : currentStep.status === 'failed' ? 'codicon-error' : 'codicon-circle-outline'} ${currentStep.status}`} />
             <span className="step-label">
               Step {currentStep.index}: {currentStep.type}
-              {currentStep.selector && <code>{currentStep.selector}</code>}
-            </span>
-          </div>
-          {(currentStep.screenshot || currentStep.selector) && (
-            <div className="step-info-actions">
-              {currentStep.screenshot && (
+              {currentStep.selector && (
                 <>
+                  <code>{currentStep.selector}</code>
                   <button
-                    className="icon-button"
-                    onClick={() => onPreviewScreenshot(currentStep.screenshot!, currentStep.index)}
-                    title="Preview in image viewer"
+                    className="icon-button small"
+                    onClick={() => onCopySelector(currentStep.selector!)}
+                    title="Copy selector"
                   >
-                    <span className="codicon codicon-eye" />
-                  </button>
-                  <button
-                    className="icon-button"
-                    onClick={() => onSaveScreenshot(currentStep.screenshot!, currentStep.index)}
-                    title="Save screenshot to file"
-                  >
-                    <span className="codicon codicon-save" />
-                  </button>
-                  <button
-                    className="icon-button"
-                    onClick={() => onAttachScreenshot(currentStep)}
-                    title="Attach as context"
-                  >
-                    <span className="codicon codicon-clippy" />
+                    <span className="codicon codicon-copy" />
                   </button>
                 </>
               )}
-              {currentStep.selector && (
-                <button
-                  className="icon-button"
-                  onClick={() => onCopySelector(currentStep.selector!)}
-                  title="Copy selector"
-                >
-                  <span className="codicon codicon-copy" />
-                </button>
-              )}
+            </span>
+          </div>
+          {currentStep.screenshot && (
+            <div className="step-info-actions">
+              <button
+                className="icon-button"
+                onClick={() => onPreviewScreenshot(currentStep.screenshot!, currentStep.index)}
+                title="Preview in image viewer"
+              >
+                <span className="codicon codicon-eye" />
+              </button>
+              <button
+                className="icon-button"
+                onClick={() => onSaveScreenshot(currentStep.screenshot!, currentStep.index)}
+                title="Save screenshot to file"
+              >
+                <span className="codicon codicon-save" />
+              </button>
+              <button
+                className="icon-button"
+                onClick={() => onAttachScreenshot(currentStep)}
+                title="Attach as context"
+              >
+                <span className="codicon codicon-clippy" />
+              </button>
             </div>
           )}
         </div>
