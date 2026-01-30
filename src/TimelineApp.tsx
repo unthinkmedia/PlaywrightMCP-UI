@@ -248,9 +248,12 @@ interface ScreenshotCarouselProps {
   onStepSelect: (index: number) => void;
   onTogglePlay: () => void;
   onPreviewScreenshot: (base64: string, stepIndex: number) => void;
+  onSaveScreenshot: (base64: string, stepIndex: number) => void;
+  onAttachScreenshot: (step: StepResult) => void;
+  onCopySelector: (selector: string) => void;
 }
 
-function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTogglePlay, onPreviewScreenshot }: ScreenshotCarouselProps) {
+function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTogglePlay, onPreviewScreenshot, onSaveScreenshot, onAttachScreenshot, onCopySelector }: ScreenshotCarouselProps) {
   const stepsWithScreenshots = steps.filter(s => s.screenshot);
   const currentStep = steps[activeIndex];
   const thumbnailsRef = useRef<HTMLDivElement>(null);
@@ -400,11 +403,51 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
       {/* Step info label */}
       {currentStep && (
         <div className="carousel-step-info">
-          <span className={`step-badge codicon ${currentStep.status === 'passed' ? 'codicon-pass' : currentStep.status === 'failed' ? 'codicon-error' : 'codicon-circle-outline'} ${currentStep.status}`} />
-          <span className="step-label">
-            Step {currentStep.index}: {currentStep.type}
-            {currentStep.selector && <code>{currentStep.selector}</code>}
-          </span>
+          <div className="step-info-left">
+            <span className={`step-badge codicon ${currentStep.status === 'passed' ? 'codicon-pass' : currentStep.status === 'failed' ? 'codicon-error' : 'codicon-circle-outline'} ${currentStep.status}`} />
+            <span className="step-label">
+              Step {currentStep.index}: {currentStep.type}
+              {currentStep.selector && <code>{currentStep.selector}</code>}
+            </span>
+          </div>
+          {(currentStep.screenshot || currentStep.selector) && (
+            <div className="step-info-actions">
+              {currentStep.screenshot && (
+                <>
+                  <button
+                    className="icon-button"
+                    onClick={() => onPreviewScreenshot(currentStep.screenshot!, currentStep.index)}
+                    title="Preview in image viewer"
+                  >
+                    <span className="codicon codicon-eye" />
+                  </button>
+                  <button
+                    className="icon-button"
+                    onClick={() => onSaveScreenshot(currentStep.screenshot!, currentStep.index)}
+                    title="Save screenshot to file"
+                  >
+                    <span className="codicon codicon-save" />
+                  </button>
+                  <button
+                    className="icon-button"
+                    onClick={() => onAttachScreenshot(currentStep)}
+                    title="Attach as context"
+                  >
+                    <span className="codicon codicon-clippy" />
+                  </button>
+                </>
+              )}
+              {currentStep.selector && (
+                <button
+                  className="icon-button"
+                  onClick={() => onCopySelector(currentStep.selector!)}
+                  title="Copy selector"
+                >
+                  <span className="codicon codicon-copy" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -928,6 +971,9 @@ export function TimelineApp() {
           onStepSelect={selectStep}
           onTogglePlay={toggleAutoPlay}
           onPreviewScreenshot={previewScreenshot}
+          onSaveScreenshot={saveScreenshot}
+          onAttachScreenshot={attachScreenshot}
+          onCopySelector={copySelector}
         />
       )}
 

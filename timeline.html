@@ -183,8 +183,12 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 12px;
-        padding-bottom: 12px;
+        padding: 12px 0;
         border-bottom: 1px solid var(--vscode-widget-border);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: var(--vscode-editor-background);
       }
 
       .timeline-header h1 {
@@ -271,9 +275,6 @@
         border-radius: 3px;
         padding: 10px 12px;
         margin-bottom: 12px;
-        position: sticky;
-        top: 0;
-        z-index: 50;
       }
 
       .summary-stats {
@@ -1055,7 +1056,7 @@
       .carousel-step-info {
         display: flex;
         align-items: center;
-        justify-content: center;
+        justify-content: space-between;
         gap: 8px;
         margin-top: 4px;
         color: var(--vscode-foreground);
@@ -1066,6 +1067,20 @@
         border: 1px solid var(--vscode-panel-border);
         width: 100%;
         box-sizing: border-box;
+      }
+
+      .carousel-step-info .step-info-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .carousel-step-info .step-info-actions {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
       }
 
       .carousel-step-info .step-badge {
