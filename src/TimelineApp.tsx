@@ -980,22 +980,25 @@ export function TimelineApp() {
       {/* List view - shown when preview is off */}
       {!showCarousel && (
         <div className="timeline-steps" ref={stepsContainerRef}>
-          {data.steps.map((step, idx) => (
+          {data.steps
+            .map((step, idx) => ({ step, originalIdx: idx })) // Preserve original index
+            .filter(({ step }) => step.type !== "screenshot") // Hide standalone screenshot steps (redundant with auto-capture)
+            .map(({ step, originalIdx }) => (
             <StepCard
               key={step.index}
               step={step}
-              isExpanded={expandedSteps.has(idx)}
-              isActive={idx === activeStepIndex}
+              isExpanded={expandedSteps.has(originalIdx)}
+              isActive={originalIdx === activeStepIndex}
               showScreenshot={true}
               onSelect={() => {
                 setIsAutoPlaying(false); // Stop autoplay when manually selecting
-                selectStep(idx);
+                selectStep(originalIdx);
               }}
               onPreviewScreenshot={previewScreenshot}
               onSaveScreenshot={saveScreenshot}
               onAttachScreenshot={attachScreenshot}
               onCopySelector={copySelector}
-              stepRef={setStepRef(idx)}
+              stepRef={setStepRef(originalIdx)}
             />
           ))}
         </div>
