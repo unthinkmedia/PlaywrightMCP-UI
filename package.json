@@ -12,6 +12,7 @@
     "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@vscode-elements/elements": "^2.4.0",
+    "@vscode/codicons": "^0.0.44",
     "playwright": "^1.40.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

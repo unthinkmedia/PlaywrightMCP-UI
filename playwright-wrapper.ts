@@ -2,10 +2,10 @@
  * Playwright Wrapper with Instrumentation
  * 
  * Wraps Playwright browser automation with step-by-step tracking,
- * screenshot capture, and replay capabilities.
+ * screenshot capture, video recording, and CDP screencast capabilities.
  */
 
-import { chromium, Browser, Page, BrowserContext } from "playwright";
+import { chromium, Browser, Page, BrowserContext, CDPSession } from "playwright";
 
 export interface PlaywrightAction {
   type: "click" | "fill" | "wait" | "screenshot" | "hover" | "select" | "navigate";
@@ -33,17 +33,55 @@ export interface RunOptions {
 
 export interface PlaywrightRunnerOptions {
   headless?: boolean;
+  /** Enable video recording */
+  recordVideo?: boolean;
+  /** Directory to save video recordings */
+  videoDir?: string;
+  /** Video size (defaults to viewport) */
+  videoSize?: { width: number; height: number };
+}
+
+export interface ScreencastOptions {
+  /** Image format (default: 'png') */
+  format?: 'jpeg' | 'png';
+  /** Image quality 0-100 (default: 80) */
+  quality?: number;
+  /** Max width of screencast frames */
+  maxWidth?: number;
+  /** Max height of screencast frames */
+  maxHeight?: number;
+  /** Capture every Nth frame (default: 1) */
+  everyNthFrame?: number;
+}
+
+export interface ScreencastFrame {
+  /** Base64 encoded image data */
+  data: string;
+  /** Frame metadata */
+  metadata: {
+    offsetTop: number;
+    pageScaleFactor: number;
+    deviceWidth: number;
+    deviceHeight: number;
+    scrollOffsetX: number;
+    scrollOffsetY: number;
+    timestamp?: number;
+  };
 }
 
 export class PlaywrightRunner {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private cdpSession: CDPSession | null = null;
+  private screencastActive: boolean = false;
   private options: PlaywrightRunnerOptions;
 
   constructor(options: PlaywrightRunnerOptions = {}) {
     this.options = {
       headless: true,
+      recordVideo: false,
+      videoDir: './videos',
       ...options,
     };
   }
@@ -63,9 +101,21 @@ export class PlaywrightRunner {
     this.browser = await chromium.launch({
       headless: this.options.headless,
     });
-    this.context = await this.browser.newContext({
+    
+    // Build context options
+    const contextOptions: Parameters<Browser['newContext']>[0] = {
       viewport: { width: 1280, height: 720 },
-    });
+    };
+    
+    // Add video recording if enabled
+    if (this.options.recordVideo) {
+      contextOptions.recordVideo = {
+        dir: this.options.videoDir || './videos',
+        size: this.options.videoSize || { width: 1280, height: 720 },
+      };
+    }
+    
+    this.context = await this.browser.newContext(contextOptions);
     this.page = await this.context.newPage();
 
     // Navigate to starting URL
@@ -285,9 +335,165 @@ export class PlaywrightRunner {
   }
 
   /**
+   * Start CDP screencast for live browser streaming.
+   * Frames are delivered via the onFrame callback.
+   */
+  async startScreencast(
+    onFrame: (frame: ScreencastFrame) => void,
+    options: ScreencastOptions = {}
+  ): Promise<void> {
+    if (!this.page) {
+      throw new Error("No active page. Call run() first or create a page manually.");
+    }
+    
+    if (this.screencastActive) {
+      throw new Error("Screencast already active");
+    }
+
+    const {
+      format = 'png',
+      quality = 80,
+      maxWidth = 1280,
+      maxHeight = 720,
+      everyNthFrame = 1,
+    } = options;
+
+    // Create CDP session
+    this.cdpSession = await this.page.context().newCDPSession(this.page);
+    
+    // Listen for screencast frames
+    this.cdpSession.on('Page.screencastFrame', async (event) => {
+      const frame: ScreencastFrame = {
+        data: event.data,
+        metadata: {
+          ...event.metadata,
+          timestamp: Date.now(),
+        },
+      };
+      
+      onFrame(frame);
+      
+      // Acknowledge the frame to receive the next one
+      if (this.cdpSession && this.screencastActive) {
+        try {
+          await this.cdpSession.send('Page.screencastFrameAck', {
+            sessionId: event.sessionId,
+          });
+        } catch {
+          // Session may have been closed
+        }
+      }
+    });
+
+    // Start the screencast
+    await this.cdpSession.send('Page.startScreencast', {
+      format,
+      quality,
+      maxWidth,
+      maxHeight,
+      everyNthFrame,
+    });
+    
+    this.screencastActive = true;
+  }
+
+  /**
+   * Stop the CDP screencast.
+   */
+  async stopScreencast(): Promise<void> {
+    if (!this.screencastActive || !this.cdpSession) {
+      return;
+    }
+
+    try {
+      await this.cdpSession.send('Page.stopScreencast');
+    } catch {
+      // Ignore errors during stop
+    }
+    
+    this.screencastActive = false;
+    
+    // Detach CDP session
+    try {
+      await this.cdpSession.detach();
+    } catch {
+      // Ignore detach errors
+    }
+    this.cdpSession = null;
+  }
+
+  /**
+   * Check if screencast is currently active.
+   */
+  isScreencastActive(): boolean {
+    return this.screencastActive;
+  }
+
+  /**
+   * Get the video file path after recording completes.
+   * Must be called after the page is closed.
+   */
+  async getVideoPath(): Promise<string | null> {
+    if (!this.page) {
+      return null;
+    }
+    
+    const video = this.page.video();
+    if (!video) {
+      return null;
+    }
+    
+    try {
+      return await video.path();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Save the recorded video to a specific path.
+   * Must be called before the browser context is closed.
+   */
+  async saveVideo(path: string): Promise<void> {
+    if (!this.page) {
+      throw new Error("No active page");
+    }
+    
+    const video = this.page.video();
+    if (!video) {
+      throw new Error("No video recording. Enable recordVideo in options.");
+    }
+    
+    await video.saveAs(path);
+  }
+
+  /**
+   * Delete the recorded video file.
+   */
+  async deleteVideo(): Promise<void> {
+    if (!this.page) {
+      return;
+    }
+    
+    const video = this.page.video();
+    if (video) {
+      try {
+        await video.delete();
+      } catch {
+        // Ignore delete errors
+      }
+    }
+  }
+
+  /**
    * Close the browser and clean up resources.
    */
   async close(): Promise<void> {
+    // Stop screencast if active
+    if (this.screencastActive) {
+      await this.stopScreencast();
+    }
+    
     if (this.page) {
       await this.page.close().catch(() => {});
       this.page = null;
