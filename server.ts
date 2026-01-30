@@ -88,11 +88,23 @@ export function createServer(): McpServer {
           .optional()
           .default(true)
           .describe("Capture screenshot after each action"),
+        screenshotFormat: z
+          .enum(["png", "jpeg"])
+          .optional()
+          .default("png")
+          .describe("Screenshot format: 'png' (lossless) or 'jpeg' (smaller file size)"),
+        screenshotQuality: z
+          .number()
+          .min(0)
+          .max(100)
+          .optional()
+          .default(80)
+          .describe("JPEG quality 0-100 (only used when format is 'jpeg')"),
         recordVideo: z
           .boolean()
           .optional()
-          .default(true)
-          .describe("Record video of the entire session (default: true)"),
+          .default(false)
+          .describe("Record video of the entire session (default: false)"),
       },
       outputSchema: {
         steps: z.array(
@@ -119,7 +131,7 @@ export function createServer(): McpServer {
         ui: { resourceUri },
       },
     },
-    async ({ url, actions, headless, captureScreenshots, recordVideo }) => {
+    async ({ url, actions, headless, captureScreenshots, screenshotFormat, screenshotQuality, recordVideo }) => {
       // Close existing runner if any
       if (runner) {
         await runner.close();
@@ -140,6 +152,8 @@ export function createServer(): McpServer {
         // Run all actions
         currentSteps = await runner.run(url, actions as PlaywrightAction[], {
           captureScreenshots,
+          screenshotFormat: screenshotFormat as 'png' | 'jpeg',
+          screenshotQuality,
         });
 
         // Calculate summary

@@ -29,6 +29,10 @@ export interface StepResult {
 export interface RunOptions {
   captureScreenshots?: boolean;
   screenshotOnFailure?: boolean;
+  /** Screenshot format: 'png' (default, lossless) or 'jpeg' (smaller size) */
+  screenshotFormat?: 'png' | 'jpeg';
+  /** JPEG quality 0-100 (default: 80) */
+  screenshotQuality?: number;
 }
 
 export interface PlaywrightRunnerOptions {
@@ -94,12 +98,18 @@ export class PlaywrightRunner {
     actions: PlaywrightAction[],
     options: RunOptions = {}
   ): Promise<StepResult[]> {
-    const { captureScreenshots = true, screenshotOnFailure = true } = options;
+    const { 
+      captureScreenshots = true, 
+      screenshotOnFailure = true,
+      screenshotFormat = 'png',
+      screenshotQuality = 80,
+    } = options;
     const steps: StepResult[] = [];
 
-    // Launch browser
+    // Launch browser with timeout
     this.browser = await chromium.launch({
       headless: this.options.headless,
+      timeout: 30000, // 30 second timeout for browser launch
     });
     
     // Build context options
@@ -128,7 +138,8 @@ export class PlaywrightRunner {
       async () => {
         await this.page!.goto(url, { waitUntil: "domcontentloaded" });
       },
-      captureScreenshots
+      captureScreenshots,
+      { format: screenshotFormat, quality: screenshotQuality }
     );
     steps.push(navStep);
 
@@ -146,7 +157,7 @@ export class PlaywrightRunner {
           index: stepIndex,
           type: action.type,
           selector: action.selector,
-          value: action.type === "fill" ? this.maskValue(action.value) : action.value,
+          value: action.type === "fill" ? this.maskValue(action.value, action.selector) : action.value,
           status: "skipped",
           duration: 0,
         });
@@ -158,10 +169,11 @@ export class PlaywrightRunner {
           index: stepIndex,
           type: action.type,
           selector: action.selector,
-          value: action.type === "fill" ? this.maskValue(action.value) : action.value,
+          value: action.type === "fill" ? this.maskValue(action.value, action.selector) : action.value,
         },
         () => this.performAction(action),
-        captureScreenshots || (screenshotOnFailure && action.type !== "screenshot")
+        captureScreenshots || (screenshotOnFailure && action.type !== "screenshot"),
+        { format: screenshotFormat, quality: screenshotQuality }
       );
 
       steps.push(step);
@@ -173,7 +185,10 @@ export class PlaywrightRunner {
   /**
    * Replay a single step from a previous run.
    */
-  async replayStep(step: StepResult): Promise<StepResult> {
+  async replayStep(
+    step: StepResult,
+    screenshotOptions: { format: 'png' | 'jpeg'; quality: number } = { format: 'png', quality: 80 }
+  ): Promise<StepResult> {
     if (!this.page) {
       throw new Error("No active page");
     }
@@ -192,7 +207,8 @@ export class PlaywrightRunner {
         value: step.value,
       },
       () => this.performAction(action),
-      true
+      true,
+      screenshotOptions
     );
   }
 
@@ -202,7 +218,8 @@ export class PlaywrightRunner {
   private async executeStep(
     metadata: Omit<StepResult, "status" | "duration" | "screenshot" | "error">,
     action: () => Promise<void>,
-    captureScreenshot: boolean
+    captureScreenshot: boolean,
+    screenshotOptions: { format: 'png' | 'jpeg'; quality: number } = { format: 'png', quality: 80 }
   ): Promise<StepResult> {
     const start = Date.now();
 
@@ -212,7 +229,7 @@ export class PlaywrightRunner {
 
       let screenshot: string | undefined;
       if (captureScreenshot && this.page) {
-        screenshot = await this.captureBase64Screenshot();
+        screenshot = await this.captureBase64Screenshot(screenshotOptions.format, screenshotOptions.quality);
       }
 
       return {
@@ -229,7 +246,7 @@ export class PlaywrightRunner {
       let screenshot: string | undefined;
       if (this.page) {
         try {
-          screenshot = await this.captureBase64Screenshot();
+          screenshot = await this.captureBase64Screenshot(screenshotOptions.format, screenshotOptions.quality);
         } catch {
           // Ignore screenshot errors during failure capture
         }
@@ -307,11 +324,18 @@ export class PlaywrightRunner {
   /**
    * Capture a base64-encoded screenshot.
    */
-  private async captureBase64Screenshot(): Promise<string> {
+  private async captureBase64Screenshot(
+    format: 'png' | 'jpeg' = 'png',
+    quality: number = 80
+  ): Promise<string> {
     if (!this.page) {
       throw new Error("No active page");
     }
-    const buffer = await this.page.screenshot({ type: "png" });
+    const options: { type: 'png' | 'jpeg'; quality?: number } = { type: format };
+    if (format === 'jpeg') {
+      options.quality = quality;
+    }
+    const buffer = await this.page.screenshot(options);
     return buffer.toString("base64");
   }
 
@@ -324,13 +348,24 @@ export class PlaywrightRunner {
 
   /**
    * Mask sensitive values (like passwords).
+   * Detects password fields by selector heuristics.
    */
-  private maskValue(value?: string): string | undefined {
+  private maskValue(value?: string, selector?: string): string | undefined {
     if (!value) return value;
-    // Simple heuristic: if it looks like a password field value, mask it
-    if (value.length > 0) {
-      return value; // In production, check the input type before masking
+    
+    // Check if selector indicates a password field
+    const isPasswordField = selector && (
+      selector.includes('[type="password"]') ||
+      selector.includes('[type=password]') ||
+      selector.toLowerCase().includes('password') ||
+      selector.includes('#password') ||
+      selector.includes('.password')
+    );
+    
+    if (isPasswordField) {
+      return '•'.repeat(Math.min(value.length, 12));
     }
+    
     return value;
   }
 
@@ -363,6 +398,9 @@ export class PlaywrightRunner {
     
     // Listen for screencast frames
     this.cdpSession.on('Page.screencastFrame', async (event) => {
+      // Guard against stale callbacks after screencast stopped
+      if (!this.screencastActive) return;
+      
       const frame: ScreencastFrame = {
         data: event.data,
         metadata: {

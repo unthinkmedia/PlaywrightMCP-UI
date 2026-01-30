@@ -6,7 +6,7 @@
  * Uses the MCP Apps SDK to communicate with the host.
  */
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Component, type ReactNode, type ErrorInfo } from "react";
 import { App, type McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
@@ -14,6 +14,53 @@ import {
   applyHostStyleVariables,
   applyHostFonts,
 } from "@modelcontextprotocol/ext-apps/react";
+
+// ============================================================
+// Error Boundary Component
+// ============================================================
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Timeline Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="timeline-app loading">
+          <span className="codicon codicon-error" style={{ fontSize: 32, color: 'var(--vscode-testing-iconFailed)' }} />
+          <p style={{ fontWeight: 500 }}>Something went wrong</p>
+          <p className="error">{this.state.error?.message || 'Unknown error'}</p>
+          <button 
+            className="vscode-button" 
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 // Safe area insets for mobile/notch handling
 interface SafeAreaInsets {
@@ -60,6 +107,7 @@ interface StepCardProps {
   onPreviewScreenshot: (base64: string, stepIndex: number) => void;
   onSaveScreenshot: (base64: string, stepIndex: number) => void;
   onAttachScreenshot: (step: StepResult) => void;
+  onCopySelector: (selector: string) => void;
   stepRef: (el: HTMLDivElement | null) => void;
 }
 
@@ -72,6 +120,7 @@ function StepCard({
   onPreviewScreenshot,
   onSaveScreenshot,
   onAttachScreenshot,
+  onCopySelector,
   stepRef,
 }: StepCardProps) {
   const statusIconClass = {
@@ -94,6 +143,11 @@ function StepCard({
         )}
         {step.value && step.type === "navigate" && (
           <code className="step-selector">{step.value}</code>
+        )}
+        {step.value && step.type === "fill" && !isExpanded && (
+          <code className="step-value-preview" title={step.value}>
+            "{step.value.length > 20 ? step.value.slice(0, 20) + '...' : step.value}"
+          </code>
         )}
         <span className="step-duration">{step.duration}ms</span>
       </div>
@@ -164,6 +218,18 @@ function StepCard({
               >
                 <span className="codicon codicon-clippy" />
               </button>
+              {step.selector && (
+                <button
+                  className="icon-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCopySelector(step.selector!);
+                  }}
+                  title="Copy selector"
+                >
+                  <span className="codicon codicon-copy" />
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -187,6 +253,7 @@ interface ScreenshotCarouselProps {
 function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTogglePlay, onPreviewScreenshot }: ScreenshotCarouselProps) {
   const stepsWithScreenshots = steps.filter(s => s.screenshot);
   const currentStep = steps[activeIndex];
+  const thumbnailsRef = useRef<HTMLDivElement>(null);
   
   // Find the index in stepsWithScreenshots array
   const currentScreenshotIndex = stepsWithScreenshots.findIndex(s => s.index === activeIndex);
@@ -221,11 +288,24 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
       } else if (e.key === ' ') {
         e.preventDefault();
         onTogglePlay();
+      } else if (e.key === 'Escape') {
+        // Let parent handle escape
+        window.dispatchEvent(new CustomEvent('carousel-escape'));
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goToPrev, goToNext, onTogglePlay]);
+
+  // Auto-scroll thumbnails to keep active one visible
+  useEffect(() => {
+    if (thumbnailsRef.current) {
+      const activeThumb = thumbnailsRef.current.querySelector('.thumbnail.active') as HTMLElement;
+      if (activeThumb) {
+        activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }, [activeIndex]);
 
   const hasPrev = stepsWithScreenshots.some(s => s.index < activeIndex);
   const hasNext = stepsWithScreenshots.some(s => s.index > activeIndex);
@@ -254,7 +334,7 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
       </div>
       
       {/* Thumbnail strip */}
-      <div className="carousel-thumbnails">
+      <div className="carousel-thumbnails" ref={thumbnailsRef}>
         {steps.map((step, idx) => (
           <button
             key={step.index}
@@ -373,10 +453,11 @@ export function TimelineApp() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [canFullscreen, setCanFullscreen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
-  const [showCarousel, setShowCarousel] = useState(true); // Show carousel by default
+  const [showCarousel, setShowCarousel] = useState(false); // Show list view by default
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [scrollSyncEnabled, setScrollSyncEnabled] = useState(true);
+  const [scrollSyncEnabled] = useState(false); // Disabled - preview only changes on click
+  const [isLoading, setIsLoading] = useState<string | null>(null); // Loading state for async operations
   const containerRef = useRef<HTMLDivElement>(null);
   const stepRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const stepsContainerRef = useRef<HTMLDivElement>(null);
@@ -482,16 +563,16 @@ export function TimelineApp() {
       const structured = result.structuredContent as TimelineData | undefined;
       if (structured?.steps) {
         setData(structured);
-        // Auto-expand failed steps
+        // Auto-expand failed steps (use array index, not step.index)
         const failedSteps = new Set(
           structured.steps
+            .map((s, idx) => ({ ...s, arrayIdx: idx }))
             .filter((s) => s.status === "failed")
-            .map((s) => s.index)
+            .map((s) => s.arrayIdx)
         );
         setExpandedSteps(failedSteps);
         
-        // Show carousel by default when we have steps
-        setShowCarousel(true);
+        // Keep list view by default, user can toggle to preview
         setActiveStepIndex(0);
         
         // Send debug log to host
@@ -535,6 +616,7 @@ export function TimelineApp() {
     async (base64: string, stepIndex: number) => {
       if (!app) return;
       
+      setIsLoading('Opening preview...');
       try {
         await app.callServerTool({
           name: "preview-screenshot",
@@ -542,6 +624,8 @@ export function TimelineApp() {
         });
       } catch (err) {
         console.error("Failed to preview screenshot:", err);
+      } finally {
+        setIsLoading(null);
       }
     },
     [app]
@@ -552,6 +636,7 @@ export function TimelineApp() {
     async (base64: string, stepIndex: number) => {
       if (!app) return;
       
+      setIsLoading('Saving screenshot...');
       try {
         await app.callServerTool({
           name: "save-screenshot",
@@ -559,6 +644,8 @@ export function TimelineApp() {
         });
       } catch (err) {
         console.error("Failed to save screenshot:", err);
+      } finally {
+        setIsLoading(null);
       }
     },
     [app]
@@ -567,29 +654,82 @@ export function TimelineApp() {
   // Attach screenshot as context
   const attachScreenshot = useCallback(
     async (step: StepResult) => {
-      if (!app) return;
+      if (!app || !step.screenshot) return;
       
       try {
-        await app.callServerTool({
-          name: "attach-screenshot",
-          arguments: { 
-            base64: step.screenshot,
-            stepIndex: step.index,
-            stepType: step.type,
-            stepSelector: step.selector,
-            stepValue: step.value,
-            stepStatus: step.status,
-            stepDuration: step.duration,
-            stepUrl: step.url,
-            stepError: step.error,
-          },
+        // Build markdown with step information
+        const lines: string[] = [];
+        lines.push(`# Playwright Step ${step.index}`);
+        lines.push('');
+        lines.push(`**Action:** ${step.type}`);
+        if (step.selector) {
+          lines.push(`**Selector:** \`${step.selector}\``);
+        }
+        if (step.value) {
+          lines.push(`**Value:** ${step.value}`);
+        }
+        const statusEmoji = step.status === 'passed' ? '✅' : step.status === 'failed' ? '❌' : '⏭️';
+        lines.push(`**Status:** ${statusEmoji} ${step.status}`);
+        lines.push(`**Duration:** ${step.duration}ms`);
+        if (step.url) {
+          lines.push(`**URL:** ${step.url}`);
+        }
+        if (step.error) {
+          lines.push('');
+          lines.push('## Error');
+          lines.push('```');
+          lines.push(step.error);
+          lines.push('```');
+        }
+        
+        // Use updateModelContext to properly attach as context for next prompt
+        await app.updateModelContext({
+          content: [
+            { 
+              type: "image", 
+              data: step.screenshot, 
+              mimeType: "image/png" 
+            },
+            {
+              type: "text",
+              text: lines.join('\n'),
+            },
+          ],
         });
+        
+        app.sendLog({ 
+          level: "info", 
+          data: `Attached step ${step.index} screenshot as context` 
+        }).catch(() => {});
       } catch (err) {
         console.error("Failed to attach screenshot:", err);
       }
     },
     [app]
   );
+
+  // Copy selector to clipboard
+  const copySelector = useCallback(
+    async (selector: string) => {
+      try {
+        await navigator.clipboard.writeText(selector);
+        setIsLoading('Copied!');
+        setTimeout(() => setIsLoading(null), 1000);
+      } catch (err) {
+        console.error("Failed to copy selector:", err);
+      }
+    },
+    []
+  );
+
+  // Listen for escape key from carousel to collapse it
+  useEffect(() => {
+    const handleCarouselEscape = () => {
+      setShowCarousel(false);
+    };
+    window.addEventListener('carousel-escape', handleCarouselEscape);
+    return () => window.removeEventListener('carousel-escape', handleCarouselEscape);
+  }, []);
 
   // Toggle fullscreen mode
   const toggleFullscreen = useCallback(async () => {
@@ -605,8 +745,6 @@ export function TimelineApp() {
 
   // Select a step: expand it, collapse others (accordion), and scroll into view
   const selectStep = useCallback((index: number) => {
-    // Temporarily disable scroll sync to prevent observer from overwriting our selection
-    setScrollSyncEnabled(false);
     setActiveStepIndex(index);
     // Toggle behavior: if already expanded, collapse; otherwise expand this and collapse others
     setExpandedSteps(prev => {
@@ -622,8 +760,6 @@ export function TimelineApp() {
     if (stepEl) {
       stepEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-    // Re-enable scroll sync after scroll animation completes
-    setTimeout(() => setScrollSyncEnabled(true), 500);
   }, []);
 
   // Store step element ref
@@ -689,8 +825,6 @@ export function TimelineApp() {
       }
     }
     setIsAutoPlaying(prev => !prev);
-    // Disable scroll sync while playing to avoid conflicts
-    setScrollSyncEnabled(prev => !prev ? true : prev);
   }, [isAutoPlaying, data, activeStepIndex]);
 
   // Scroll-based active step detection
@@ -759,13 +893,22 @@ export function TimelineApp() {
       <header className="timeline-header">
         <h1><span className="codicon codicon-beaker icon" /> Timeline</h1>
         <div className="header-actions">
-          <button 
-            onClick={() => setShowCarousel(!showCarousel)} 
-            className={`vscode-button ${showCarousel ? "active" : "secondary"}`} 
-            title="Toggle screenshot carousel"
-          >
-            <span className={`codicon ${showCarousel ? 'codicon-eye-closed' : 'codicon-eye'}`} /> {showCarousel ? 'Hide Preview' : 'Show Preview'}
-          </button>
+          <div className="button-group">
+            <button 
+              onClick={() => setShowCarousel(false)} 
+              className={`icon-button ${!showCarousel ? "active" : ""}`} 
+              title="List view"
+            >
+              <span className="codicon codicon-list-unordered" />
+            </button>
+            <button 
+              onClick={() => setShowCarousel(true)} 
+              className={`icon-button ${showCarousel ? "active" : ""}`} 
+              title="Preview"
+            >
+              <span className="codicon codicon-eye" />
+            </button>
+          </div>
           {canFullscreen && (
             <button onClick={toggleFullscreen} className="vscode-button secondary" title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
               <span className={`codicon ${isFullscreen ? 'codicon-screen-normal' : 'codicon-screen-full'}`} /> {isFullscreen ? "Exit" : "Fullscreen"}
@@ -773,6 +916,8 @@ export function TimelineApp() {
           )}
         </div>
       </header>
+
+      <SummaryBar summary={data.summary} />
 
       {/* Screenshot carousel */}
       {showCarousel && data.steps.length > 0 && (
@@ -786,27 +931,46 @@ export function TimelineApp() {
         />
       )}
 
-      <SummaryBar summary={data.summary} />
+      {/* Loading indicator */}
+      {isLoading && (
+        <div className="loading-toast">
+          <span className="codicon codicon-loading spin" />
+          {isLoading}
+        </div>
+      )}
 
-      <div className="timeline-steps" ref={stepsContainerRef}>
-        {data.steps.map((step, idx) => (
-          <StepCard
-            key={step.index}
-            step={step}
-            isExpanded={expandedSteps.has(step.index)}
-            isActive={idx === activeStepIndex}
-            showScreenshot={!showCarousel}
-            onSelect={() => {
-              setIsAutoPlaying(false); // Stop autoplay when manually selecting
-              selectStep(idx);
-            }}
-            onPreviewScreenshot={previewScreenshot}
-            onSaveScreenshot={saveScreenshot}
-            onAttachScreenshot={attachScreenshot}
-            stepRef={setStepRef(idx)}
-          />
-        ))}
-      </div>
+      {/* List view - shown when preview is off */}
+      {!showCarousel && (
+        <div className="timeline-steps" ref={stepsContainerRef}>
+          {data.steps.map((step, idx) => (
+            <StepCard
+              key={step.index}
+              step={step}
+              isExpanded={expandedSteps.has(idx)}
+              isActive={idx === activeStepIndex}
+              showScreenshot={true}
+              onSelect={() => {
+                setIsAutoPlaying(false); // Stop autoplay when manually selecting
+                selectStep(idx);
+              }}
+              onPreviewScreenshot={previewScreenshot}
+              onSaveScreenshot={saveScreenshot}
+              onAttachScreenshot={attachScreenshot}
+              onCopySelector={copySelector}
+              stepRef={setStepRef(idx)}
+            />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+// Export wrapped with ErrorBoundary for use in main.tsx
+export function TimelineAppWithErrorBoundary() {
+  return (
+    <ErrorBoundary>
+      <TimelineApp />
+    </ErrorBoundary>
   );
 }

@@ -271,6 +271,9 @@
         border-radius: 3px;
         padding: 10px 12px;
         margin-bottom: 12px;
+        position: sticky;
+        top: 0;
+        z-index: 50;
       }
 
       .summary-stats {
@@ -531,6 +534,33 @@
 
       .icon-button .codicon {
         font-size: 14px;
+      }
+
+      .icon-button.active {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+      }
+
+      .icon-button.active:hover {
+        background: var(--vscode-button-hoverBackground);
+      }
+
+      /* Button Group */
+      .button-group {
+        display: inline-flex;
+        border-radius: 3px;
+        overflow: hidden;
+        border: 1px solid var(--vscode-widget-border);
+      }
+
+      .button-group .icon-button {
+        border-radius: 0;
+        border: none;
+        margin: 0;
+      }
+
+      .button-group .icon-button:not(:last-child) {
+        border-right: 1px solid var(--vscode-widget-border);
       }
 
       /* ============================================================
@@ -888,9 +918,6 @@
         border-radius: 3px;
         margin-bottom: 12px;
         overflow: hidden;
-        position: sticky;
-        top: 0;
-        z-index: 100;
       }
 
       .carousel-header {
@@ -1188,6 +1215,56 @@
       .step-card.active-step code.step-selector {
         background: rgba(255, 255, 255, 0.15);
         border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      /* ============================================================
+         Step Value Preview (collapsed state)
+         ============================================================ */
+      .step-value-preview {
+        color: var(--vscode-descriptionForeground);
+        font-family: var(--vscode-editor-font-family);
+        font-size: 11px;
+        opacity: 0.8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 150px;
+      }
+
+      /* ============================================================
+         Loading Toast
+         ============================================================ */
+      .loading-toast {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        padding: 8px 16px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        animation: slideUp 0.2s ease;
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+
+      .loading-toast .codicon {
+        font-size: 14px;
       }
     </style>
   </head>

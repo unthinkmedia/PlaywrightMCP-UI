@@ -58,7 +58,7 @@ async function testVideoRecording() {
 
   const runner = new PlaywrightRunner({
     headless: false,
-    recordVideo: true,
+    recordVideo: false,
     videoDir: "./videos",
   });
 
@@ -100,7 +100,7 @@ async function testBothFeatures() {
 
   const runner = new PlaywrightRunner({
     headless: false,
-    recordVideo: true,
+    recordVideo: false,
     videoDir: "./videos",
   });
 
