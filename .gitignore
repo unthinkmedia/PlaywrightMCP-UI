@@ -21,4 +21,13 @@ npm-debug.log*
 # Environment
 .env
 .env.local
+
+# Playwright artifacts
 videos/
+screenshots/
+test-results/
+playwright-report/
+
+# Temporary files
+*.tmp
+*.temp
