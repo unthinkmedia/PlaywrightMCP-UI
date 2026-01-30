@@ -995,47 +995,40 @@
       .carousel-step-info {
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: 8px;
-        margin-top: 8px;
-        color: #fff;
-        font-size: 12px;
-        background: rgba(0, 0, 0, 0.6);
-        padding: 6px 12px;
-        border-radius: 3px;
-        align-self: stretch;
+        margin-top: 12px;
+        color: var(--vscode-foreground);
+        font-size: 13px;
+        background: var(--vscode-editor-background);
+        padding: 8px 16px;
+        border-radius: 4px;
+        border: 1px solid var(--vscode-panel-border);
         width: 100%;
         box-sizing: border-box;
       }
 
       .carousel-step-info .step-badge {
-        width: 18px;
-        height: 18px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        font-size: 14px;
+        font-size: 16px;
       }
 
       .carousel-step-info .step-badge.passed {
-        background: var(--vscode-testing-iconPassed);
-        color: #fff;
+        color: var(--vscode-testing-iconPassed);
       }
 
       .carousel-step-info .step-badge.failed {
-        background: var(--vscode-testing-iconFailed);
-        color: #fff;
+        color: var(--vscode-testing-iconFailed);
       }
 
       .carousel-step-info .step-badge.skipped {
-        background: var(--vscode-testing-iconSkipped);
-        color: #fff;
+        color: var(--vscode-testing-iconSkipped);
       }
 
       .carousel-step-info .step-label {
         display: flex;
         align-items: center;
         gap: 6px;
+        font-weight: 500;
       }
 
       .carousel-step-info code {

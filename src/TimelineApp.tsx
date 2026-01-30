@@ -252,50 +252,6 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
         </div>
       </div>
       
-      <div className="carousel-content">
-        <button 
-          className="carousel-nav prev" 
-          onClick={goToPrev} 
-          disabled={!hasPrev}
-          title="Previous (←)"
-        >
-          <span className="codicon codicon-chevron-left" />
-        </button>
-        
-        <div className="carousel-image-container">
-          {currentStep?.screenshot ? (
-            <>
-              <img
-                src={`data:image/png;base64,${currentStep.screenshot}`}
-                alt={`Step ${activeIndex}: ${currentStep.type}`}
-                className="carousel-image"
-              />
-              <div className="carousel-step-info">
-                <span className={`step-badge codicon ${currentStep.status === 'passed' ? 'codicon-pass' : currentStep.status === 'failed' ? 'codicon-error' : 'codicon-circle-outline'} ${currentStep.status}`} />
-                <span className="step-label">
-                  Step {currentStep.index}: {currentStep.type}
-                  {currentStep.selector && <code>{currentStep.selector}</code>}
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="carousel-no-screenshot">
-              <span className="codicon codicon-device-camera no-screenshot-icon" />
-              <p>No screenshot for this step</p>
-            </div>
-          )}
-        </div>
-        
-        <button 
-          className="carousel-nav next" 
-          onClick={goToNext} 
-          disabled={!hasNext}
-          title="Next (→)"
-        >
-          <span className="codicon codicon-chevron-right" />
-        </button>
-      </div>
-      
       {/* Thumbnail strip */}
       <div className="carousel-thumbnails">
         {steps.map((step, idx) => (
@@ -314,6 +270,52 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
           </button>
         ))}
       </div>
+
+      <div className="carousel-content">
+        <button 
+          className="carousel-nav prev" 
+          onClick={goToPrev} 
+          disabled={!hasPrev}
+          title="Previous (←)"
+        >
+          <span className="codicon codicon-chevron-left" />
+        </button>
+        
+        <div className="carousel-image-container">
+          {currentStep?.screenshot ? (
+            <img
+              src={`data:image/png;base64,${currentStep.screenshot}`}
+              alt={`Step ${activeIndex}: ${currentStep.type}`}
+              className="carousel-image"
+            />
+          ) : (
+            <div className="carousel-no-screenshot">
+              <span className="codicon codicon-device-camera no-screenshot-icon" />
+              <p>No screenshot for this step</p>
+            </div>
+          )}
+        </div>
+        
+        <button 
+          className="carousel-nav next" 
+          onClick={goToNext} 
+          disabled={!hasNext}
+          title="Next (→)"
+        >
+          <span className="codicon codicon-chevron-right" />
+        </button>
+      </div>
+
+      {/* Step info label */}
+      {currentStep && (
+        <div className="carousel-step-info">
+          <span className={`step-badge codicon ${currentStep.status === 'passed' ? 'codicon-pass' : currentStep.status === 'failed' ? 'codicon-error' : 'codicon-circle-outline'} ${currentStep.status}`} />
+          <span className="step-label">
+            Step {currentStep.index}: {currentStep.type}
+            {currentStep.selector && <code>{currentStep.selector}</code>}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -592,6 +594,8 @@ export function TimelineApp() {
 
   // Select a step: expand it, collapse others (accordion), and scroll into view
   const selectStep = useCallback((index: number) => {
+    // Temporarily disable scroll sync to prevent observer from overwriting our selection
+    setScrollSyncEnabled(false);
     setActiveStepIndex(index);
     // Accordion behavior: expand only this step, collapse others
     setExpandedSteps(new Set([index]));
@@ -600,6 +604,8 @@ export function TimelineApp() {
     if (stepEl) {
       stepEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
+    // Re-enable scroll sync after scroll animation completes
+    setTimeout(() => setScrollSyncEnabled(true), 500);
   }, []);
 
   // Store step element ref

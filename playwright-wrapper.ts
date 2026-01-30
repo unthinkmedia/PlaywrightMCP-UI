@@ -121,7 +121,7 @@ export class PlaywrightRunner {
     // Navigate to starting URL
     const navStep = await this.executeStep(
       {
-        index: 0,
+        index: 1,
         type: "navigate",
         value: url,
       },
@@ -135,7 +135,7 @@ export class PlaywrightRunner {
     // Execute each action
     for (let i = 0; i < actions.length; i++) {
       const action = actions[i];
-      const stepIndex = i + 1;
+      const stepIndex = i + 2;
 
       // Skip remaining actions if previous failed (unless it's a screenshot)
       if (
