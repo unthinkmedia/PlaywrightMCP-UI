@@ -81,8 +81,8 @@ export function createServer(): McpServer {
         headless: z
           .boolean()
           .optional()
-          .default(false)
-          .describe("Run browser in headless mode (default: false for live preview)"),
+          .default(true)
+          .describe("Run browser in headless mode (default: true)"),
         captureScreenshots: z
           .boolean()
           .optional()

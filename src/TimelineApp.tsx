@@ -318,7 +318,6 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
     <div className="screenshot-carousel">
       <div className="carousel-header">
         <span className="carousel-title">
-          <span className="codicon codicon-file-media carousel-icon" />
           Step Screenshots
           <span className="carousel-counter">
             {currentScreenshotIndex >= 0 ? currentScreenshotIndex + 1 : 0} / {stepsWithScreenshots.length}
@@ -334,25 +333,6 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
             {isPlaying ? ' Pause' : isAtEnd ? ' Replay' : ' Play'}
           </button>
         </div>
-      </div>
-      
-      {/* Thumbnail strip */}
-      <div className="carousel-thumbnails" ref={thumbnailsRef}>
-        {steps.map((step, idx) => (
-          <button
-            key={step.index}
-            className={`thumbnail ${idx === activeIndex ? 'active' : ''} ${!step.screenshot ? 'no-image' : ''}`}
-            onClick={() => onStepSelect(idx)}
-            title={`Step ${step.index}: ${step.type}`}
-          >
-            {step.screenshot ? (
-              <img src={`data:image/png;base64,${step.screenshot}`} alt="" />
-            ) : (
-              <span className="thumbnail-placeholder">{step.index}</span>
-            )}
-            <span className={`thumbnail-status ${step.status}`} />
-          </button>
-        ))}
       </div>
 
       <div className="carousel-content">
@@ -398,6 +378,25 @@ function ScreenshotCarousel({ steps, activeIndex, isPlaying, onStepSelect, onTog
         >
           <span className="codicon codicon-chevron-right" />
         </button>
+      </div>
+
+      {/* Thumbnail strip */}
+      <div className="carousel-thumbnails" ref={thumbnailsRef}>
+        {steps.map((step, idx) => (
+          <button
+            key={step.index}
+            className={`thumbnail ${idx === activeIndex ? 'active' : ''} ${!step.screenshot ? 'no-image' : ''}`}
+            onClick={() => onStepSelect(idx)}
+            title={`Step ${step.index}: ${step.type}`}
+          >
+            {step.screenshot ? (
+              <img src={`data:image/png;base64,${step.screenshot}`} alt="" />
+            ) : (
+              <span className="thumbnail-placeholder">{step.index}</span>
+            )}
+            <span className={`thumbnail-status ${step.status}`} />
+          </button>
+        ))}
       </div>
 
       {/* Step info label */}
